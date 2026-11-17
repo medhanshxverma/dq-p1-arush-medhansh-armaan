@@ -2,13 +2,16 @@
 import argparse
 import csv
 import random
+import math
+import statistics
+from collections import defaultdict
 from pathlib import Path
 
 def build_circuit(n, density, layers, seed):
     from qiskit import QuantumCircuit
     rng = random.Random(seed)
     forward = QuantumCircuit(n)
-    count = round(density * (n // 2))
+    count = int(math.floor(density * (n // 2) + 0.5))
     for _ in range(layers):
         for q in range(n):
             getattr(forward, rng.choice(("h", "s", "x")))(q)
@@ -43,9 +46,10 @@ def run(args):
     for n in args.qubits:
         for density in args.densities:
             for trial in range(args.trials):
-                seed = args.seed + 100000*n + round(density*100)*1000 + trial
+                seed = args.seed + 100000*n + round(density*100)*10000 + trial
                 original = build_circuit(n, density, args.layers, seed)
                 original_cx = original.count_ops().get("cx", 0)
+                realized_density = original_cx / (2 * args.layers * (n // 2))
                 for topology in ("line", "all_to_all"):
                     coupling = (CouplingMap.from_line(n, bidirectional=True)
                                 if topology == "line" else CouplingMap.from_full(n))
@@ -61,12 +65,13 @@ def run(args):
                         circuit, shots=args.shots,
                         seed_simulator=seed).result().get_counts().get("0"*n, 0)
                     row = dict(
-                        qubits=n, target_density=density, trial=trial,
+                        qubits=n, target_density=density, realized_density=realized_density,
+                        layers_forward=args.layers, trial=trial,
                         topology=topology, logical_cx=original_cx,
-                        cx_count=cx, swap_count=swaps,
+                        compiled_cx=cx, swap_count=swaps, effective_cx=cx+3*swaps,
                         added_cx_equivalents=cx+3*swaps-original_cx,
                         compiled_depth=circuit.depth(), shots=args.shots,
-                        success_probability=count/args.shots)
+                        zero_counts=count, success_probability=count/args.shots)
                     rows.append(row)
                     print(row)
     return rows
@@ -76,28 +81,47 @@ def export(rows, directory):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     directory.mkdir(parents=True, exist_ok=True)
-    with (directory/"results.csv").open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+    fields = list(rows[0])
+    with (directory/"raw_results.csv").open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
+    summary=[]
     for n in sorted(set(r["qubits"] for r in rows)):
-        subset = [r for r in rows if r["qubits"] == n]
-        for metric in ("success_probability", "swap_count", "compiled_depth"):
-            fig, ax = plt.subplots(figsize=(6,4))
-            for layout in ("line", "all_to_all"):
-                points = []
-                for d in sorted(set(r["target_density"] for r in subset)):
-                    values = [r[metric] for r in subset
-                              if r["target_density"] == d and r["topology"] == layout]
-                    points.append((d, sum(values)/len(values)))
-                ax.plot([p[0] for p in points],
-                        [p[1] for p in points], marker="o", label=layout)
-            ax.set_xlabel("Target two-qubit density")
-            ax.set_ylabel(metric)
-            ax.set_title(f"{n} qubits — {metric}")
+        for density in sorted(set(r["target_density"] for r in rows)):
+            for topology in ("all_to_all", "line"):
+                group=[r for r in rows if r["qubits"]==n and r["target_density"]==density and r["topology"]==topology]
+                def avg(k):
+                    return statistics.mean(r[k] for r in group)
+                summary.append(dict(qubits=n, target_density=density, topology=topology, trials=len(group),
+                    mean_realized_density=avg("realized_density"),mean_swaps=avg("swap_count"),
+                    mean_compiled_depth=avg("compiled_depth"),mean_added_cx_equivalents=avg("added_cx_equivalents"),
+                    mean_success_probability=avg("success_probability")))
+    with (directory/"summary.csv").open("w", newline="") as f:
+        writer=csv.DictWriter(f, fieldnames=list(summary[0]))
+        writer.writeheader()
+        writer.writerows(summary)
+    for n in sorted(set(r["qubits"] for r in summary)):
+        subset=[r for r in summary if r["qubits"]==n]
+        for metric, key, ylabel in (
+            ("success","mean_success_probability","P(all-zero outcome)"),
+            ("swaps","mean_swaps","Mean added SWAP gates"),
+            ("depth","mean_compiled_depth","Mean transpiled circuit depth")):
+            fig, ax=plt.subplots(figsize=(6.4,4.2))
+            for topology in ("line","all_to_all"):
+                points=sorted((r for r in subset if r["topology"]==topology),
+                             key=lambda r:r["target_density"])
+                ax.plot([r["target_density"] for r in points],
+                        [r[key] for r in points],marker="o",label=topology.replace("_","-"))
+            ax.set_title(f"{n} qubits: {ylabel}")
+            ax.set_xlabel("Target two-qubit gate density")
+            ax.set_ylabel(ylabel)
+            if metric=="success":
+                ax.set_ylim(0,1.03)
             ax.legend()
+            ax.grid(alpha=.25)
             fig.tight_layout()
-            fig.savefig(directory/f"{metric}_{n}q.png", dpi=160)
+            fig.savefig(directory/f"{metric}_{n}q.png",dpi=160)
             plt.close(fig)
 
 def main():
@@ -124,7 +148,8 @@ def main():
         export(run(a), a.output_dir)
     except ModuleNotFoundError as exc:
         raise SystemExit(f"Missing dependency {exc.name}; install requirements.txt") from exc
-    print("These are simulation results, not real-QPU measurements.")
+    print(f"Saved {len(rows)} simulator trials and summary/plots in {a.output_dir}/")
+    print("These are synthetic-noise simulations, not real-QPU measurements.")
 
 if __name__ == "__main__":
     main()
