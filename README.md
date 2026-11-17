@@ -2,6 +2,9 @@
 
 **Team:** Arush Kapoor, Medhansh Verma, Armaan Ahmed
 
+## Project status
+**Qiskit simulation completed on November 17, 2026.** The experiment was executed successfully on a Mac, generating 54 simulator records, a summary CSV, and plots. The measured simulation results are committed in the [`results/`](results/) folder. We report these as Qiskit Aer results, not measurements from a physical quantum computer.
+
 ## Question
 Does higher two-qubit gate density reduce success probability more on a linearly connected quantum processor than on a fully connected processor?
 
@@ -49,7 +52,7 @@ Results will appear in `results/` or `results_quick/` as raw_results.csv, summar
 
 ## Recorded simulation results (November 17, 2026)
 
-The team ran the experiment on a Mac with Qiskit and Aer: **54 simulator records**, three trial seeds per setting, and **1,024 shots per trial**. Data are in [raw results](results/raw_results.csv) and [summary](results/summary.csv).
+The experiment ran successfully on a Mac with Qiskit Aer on November 17, 2026: **54 simulator records**, three trial seeds per setting, and **1,024 measurement shots per trial**. Data are in [raw results](results/raw_results.csv) and [summary](results/summary.csv).
 
 At eight qubits and target gate density 1.0, the linear topology had **26.63%** average all-zero success, **49.33** inserted SWAPs, and compiled depth **69**. The fully connected topology had **75.55%** success, zero SWAPs, and depth **17**. At density zero, both topologies gave matching results.
 
@@ -73,4 +76,4 @@ The SVG charts below were recreated from the uploaded summary CSV and render dir
 - [x] Run the Qiskit experiment on Mac; full results generated
 - [x] Commit original CSV files and nine redrawn SVG charts
 
-**Evidence boundary:** These are simulated measurements, not physical QPU measurements. Re-running the updated repository script is recommended to independently verify reproducibility.
+**Verification note:** The original Qiskit Aer run completed successfully and its recorded outputs are available above. These are results from a simulated noise model, not physical QPU measurements. The repository script was updated after the local run to align its output files and column names with the recorded data; independently rerunning that updated version is a useful reproducibility check.
