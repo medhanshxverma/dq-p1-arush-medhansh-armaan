@@ -45,17 +45,32 @@ For a quick run:
 python experiment.py --qubits 4 6 --densities 0 0.5 1 --trials 1 --shots 256 --output-dir results_quick
 ```
 
-Results will appear in `results/` or `results_quick/` as a CSV file and PNG plots of success rates, added SWAP gates, and compiled depth.
+Results will appear in `results/` or `results_quick/` as raw_results.csv, summary.csv, and PNG plots.
 
-## Interpretation
-**Predicted**: line topology needs more routing operations, with a potentially larger success penalty at high two-qubit density.
+## Recorded simulation results (November 17, 2026)
 
-**To establish**: actually execute the script, inspect results from multiple seeds, then report measured *simulation* findings. Saturation and random circuit variability can make the success gap nonmonotonic.
+The team ran the experiment on a Mac with Qiskit and Aer: **54 simulator records**, three trial seeds per setting, and **1,024 shots per trial**. Data are in [raw results](results/raw_results.csv) and [summary](results/summary.csv).
+
+At eight qubits and target gate density 1.0, the linear topology had **26.63%** average all-zero success, **49.33** inserted SWAPs, and compiled depth **69**. The fully connected topology had **75.55%** success, zero SWAPs, and depth **17**. At density zero, both topologies gave matching results.
+
+At six qubits, a requested density of 0.5 becomes realized density 2/3 because the pair count is rounded.
+
+The findings support the hypothesis **under this synthetic-noise simulation**. They do not establish the behavior of real processors. Further validation should test multiple routing algorithms, noise assumptions, and circuit families.
+
+### Results graphs
+
+The SVG charts below were recreated from the uploaded summary CSV and render directly on GitHub. Original Matplotlib PNGs are still in the team's local results folder.
+
+| Qubits | Success | SWAPs | Compiled depth |
+| --- | --- | --- | --- |
+| 4 | [Graph](results/success_4q.svg) | [Graph](results/swaps_4q.svg) | [Graph](results/depth_4q.svg) |
+| 6 | [Graph](results/success_6q.svg) | [Graph](results/swaps_6q.svg) | [Graph](results/depth_6q.svg) |
+| 8 | [Graph](results/success_8q.svg) | [Graph](results/swaps_8q.svg) | [Graph](results/depth_8q.svg) |
 
 ## Status
 - [x] Defined hypothesis and supporting literature
 - [x] Created source code and dependency manifest
-- [ ] Run Qiskit experiment and verify behavior on local computer
-- [ ] Review actual results and commit CSV/plots
+- [x] Run the Qiskit experiment on Mac; full results generated
+- [x] Commit original CSV files and nine redrawn SVG charts
 
-**No experimental results are claimed here.** The source has been written, but Qiskit was unavailable in the authoring runtime. The team should run and validate before using figures in a flash talk.
+**Evidence boundary:** These are simulated measurements, not physical QPU measurements. Re-running the updated repository script is recommended to independently verify reproducibility.
